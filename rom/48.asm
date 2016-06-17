@@ -16847,31 +16847,23 @@ L32BD:  DEC     HL              ; address 3rd byte
 
 ; used 11 times
 ;; stk-zero                                                 00 00 00 00 00
-L32C5:  DEFB    $00             ;;Bytes: 1
-        DEFB    $B0             ;;Exponent $00
-        DEFB    $00             ;;(+00,+00,+00)
+L32C5:  DEFB    $00, $00, $00, $00, $00
 
 ; used 19 times
 ;; stk-one                                                  00 00 01 00 00
-L32C8:  DEFB    $40             ;;Bytes: 2
-        DEFB    $B0             ;;Exponent $00
-        DEFB    $00,$01         ;;(+00,+00)
+L32C8:  DEFB    $00, $00, $01, $00, $00
 
 ; used 9 times
 ;; stk-half                                                 80 00 00 00 00
-L32CC:  DEFB    $30             ;;Exponent: $80, Bytes: 1
-        DEFB    $00             ;;(+00,+00,+00)
+L32CC:  DEFB    $80, $00, $00, $00, $00
 
 ; used 4 times.
 ;; stk-pi/2                                                 81 49 0F DA A2
-L32CE:  DEFB    $F1             ;;Exponent: $81, Bytes: 4
-        DEFB    $49,$0F,$DA,$A2 ;;
+L32CE:  DEFB    $81, $49, $0F, $DA, $A2
 
 ; used 3 times.
 ;; stk-ten                                                  00 00 0A 00 00
-L32D3:  DEFB    $40             ;;Bytes: 2
-        DEFB    $B0             ;;Exponent $00
-        DEFB    $00,$0A         ;;(+00,+00)
+L32D3:  DEFB    $00, $00, $0A, $00, $00
 
 
 ; ------------------------
@@ -17237,40 +17229,6 @@ L33F1:  DEC     B               ; decrement B counter
         INC     DE              ; increase destination
         JR      L33F1           ; loop back to STK-ZEROS until done.
 
-; -------------------------------
-; THE 'SKIP CONSTANTS' SUBROUTINE
-; -------------------------------
-;   This routine traverses variable-length entries in the table of constants,
-;   stacking intermediate, unwanted constants onto a dummy calculator stack,
-;   in the first five bytes of ROM.  The destination DE normally points to the
-;   end of the calculator stack which might be in the normal place or in the
-;   system variables area during E-LINE-NO; INT-TO-FP; stk-ten.  In any case,
-;   it would be simpler all round if the routine just shoved unwanted values 
-;   where it is going to stick the wanted value.  The instruction LD DE, $0000 
-;   can be removed.
-
-;; SKIP-CONS
-L33F7:  AND     A               ; test if initially zero.
-
-;; SKIP-NEXT
-L33F8:  RET     Z               ; return if zero.          >>
-
-        PUSH    AF              ; save count.
-        PUSH    DE              ; and normal STKEND
-
-        LD      DE,$0000        ; dummy value for STKEND at start of ROM
-                                ; Note. not a fault but this has to be
-                                ; moved elsewhere when running in RAM.
-                                ; e.g. with Expandor Systems 'Soft ROM'.
-                                ; Better still, write to the normal place.
-        CALL    L33C8           ; routine STK-CONST works through variable
-                                ; length records.
-
-        POP     DE              ; restore real STKEND
-        POP     AF              ; restore count
-        DEC     A               ; decrease
-        JR      L33F8           ; loop back to SKIP-NEXT
-
 ; ------------------------------
 ; THE 'LOCATE MEMORY' SUBROUTINE
 ; ------------------------------
@@ -17314,25 +17272,16 @@ L340F:  PUSH    DE              ; save STKEND
 ; Stack a constant (A0 etc.)
 ; --------------------------
 ; This routine allows a one-byte instruction to stack up to 32 constants
-; held in short form in a table of constants. In fact only 5 constants are
-; required. On entry the A register holds the literal ANDed with 1F.
-; It isn't very efficient and it would have been better to hold the
-; numbers in full, five byte form and stack them in a similar manner
-; to that used for semi-tone table values.
+; in a table. On entry the A register holds the literal ANDed with 1F.
 
 ;; stk-const-xx
-L341B:  LD      H,D             ; save STKEND - required for result
-        LD      L,E             ;
-        EXX                     ; swap
-        PUSH    HL              ; save pointer to next literal
-        LD      HL,L32C5        ; Address: stk-zero - start of table of
-                                ; constants
-        EXX                     ;
-        CALL    L33F7           ; routine SKIP-CONS
-        CALL    L33C8           ; routine STK-CONST
-        EXX                     ;
-        POP     HL              ; restore pointer to next literal.
-        EXX                     ;
+L341B:  PUSH    DE              ; save STKEND
+        LD      HL,L32C5        ; stk-zero - start of table of constants
+        CALL    L3406           ; routine LOC-MEM so that HL = first byte
+        CALL    L33C0           ; routine MOVE-FP moves 5 bytes with memory
+                                ; check.
+                                ; DE now points to new STKEND.
+        POP     HL              ; original STKEND is now RESULT pointer.
         RET                     ; return.
 
 ; --------------------------------
