@@ -11482,39 +11482,6 @@ L24F9:  RST     08H             ; ERROR-1
 ; system is remarkably robust.
 
 
-; ---------------------------------
-; Scan expression or sub-expression
-; ---------------------------------
-;
-;
-
-;; SCANNING
-L24FB:  RST     18H             ; GET-CHAR
-        LD      B,$00           ; priority marker zero is pushed on stack
-                                ; to signify end of expression when it is
-                                ; popped off again.
-        PUSH    BC              ; put in on stack.
-                                ; and proceed to consider the first character
-                                ; of the expression.
-
-;; S-LOOP-1
-L24FF:  LD      C,A             ; store the character while a look up is done.
-        LD      HL,L2596        ; Address: scan-func
-        CALL    L16DC           ; routine INDEXER is called to see if it is
-                                ; part of a limited range '+', '(', 'ATTR' etc.
-
-        LD      A,C             ; fetch the character back
-        JP      NC,L2684        ; jump forward to S-ALPHNUM if not in primary
-                                ; operators and functions to consider in the
-                                ; first instance a digit or a variable and
-                                ; then anything else.                >>>
-
-        LD      B,$00           ; but here if it was found in table so
-        LD      C,(HL)          ; fetch offset from table and make B zero.
-        ADD     HL,BC           ; add the offset to position found
-        JP      (HL)            ; and jump to the routine e.g. S-BIN
-                                ; making an indirect exit from there.
-
 ; -------------------------------------------------------------------------
 ; The four service subroutines for routines in the scanning function table
 ; -------------------------------------------------------------------------
@@ -11713,26 +11680,11 @@ L2580:  CALL    L2307           ; routine STK-TO-BC fetches line to C,
 ; -----------------------
 ; This table is used by INDEXER routine to find the offsets to
 ; four operators and eight functions. e.g. $A8 is the token 'FN'.
-; This table is used in the first instance for the first character of an
-; expression or by a recursive call to SCANNING for the first character of
-; any sub-expression. It eliminates functions that have no argument or
-; functions that can have more than one argument and therefore require
-; braces. By eliminating and dealing with these now it can later take a
-; simplistic approach to all other functions and assume that they have
-; one argument.
-; Similarly by eliminating BIN and '.' now it is later able to assume that
-; all numbers begin with a digit and that the presence of a number or
-; variable can be detected by a call to ALPHANUM.
+;
 ; By default all expressions are positive and the spurious '+' is eliminated
 ; now as in print +2. This should not be confused with the operator '+'.
 ; Note. this does allow a degree of nonsense to be accepted as in
 ; PRINT +"3 is the greatest.".
-; An acquired programming skill is the ability to include brackets where
-; they are not necessary.
-; A bracket at the start of a sub-expression may be spurious or necessary
-; to denote that the contained expression is to be evaluated as an entity.
-; In either case this is dealt with by recursive calls to SCANNING.
-; An expression that begins with a quote requires special treatment.
 
 ;; scan-func
 L2596:  DEFB    $22, L25B3-$-1  ; $1C offset to S-QUOTE
@@ -12040,20 +11992,39 @@ L267B:  CALL    L2522           ; routine S-2-COORD
         RST     20H             ; NEXT-CHAR
         JR      L26C3           ; forward to S-NUMERIC
 
-; -----------------------------
+; ---------------------------------
+; Scan expression or sub-expression
+; ---------------------------------
 
-; ==> The branch was here if not in table.
+;; SCANNING
+L24FB:  RST     18H             ; GET-CHAR
+        LD      B,$00           ; priority marker zero is pushed on stack
+                                ; to signify end of expression when it is
+                                ; popped off again.
+        PUSH    BC              ; put in on stack.
+                                ; and proceed to consider the first character
+                                ; of the expression.
 
-;; S-ALPHNUM
-L2684:  CALL    L2C88           ; routine ALPHANUM checks if variable or
-                                ; a digit.
-        JR      NC,L26DF        ; forward to S-NEGATE if not to consider
-                                ; a '-' character then functions.
+;; S-LOOP-1
+L24FF:  CALL    L2D1B           ; routine NUMERIC resets carry if digit found
+        JR      NC,L268D        ; jump to S-DECIMAL if so
 
-        CP      $41             ; compare 'A'
-        JR      NC,L26C9        ; forward to S-LETTER if alpha       ->
-                                ; else must have been numeric so continue
-                                ; into that routine.
+        CALL    L2C8D           ; routine ALPHA sets carray if letter found
+        JR      C,L26C9         ; jump to S-LETTER if so
+
+        LD      C,A             ; store the character while a look up is done.
+        LD      HL,L2596        ; Address: scan-func
+        CALL    L16DC           ; routine INDEXER is called to see if it is
+                                ; part of a limited range '+', '(', 'ATTR' etc.
+
+        LD      A,C             ; fetch the character back
+        JR      NC,L26DF        ; jump forward to S-NEGATE if not found
+
+        LD      B,$00           ; but here if it was found in table so
+        LD      C,(HL)          ; fetch offset from table and make B zero.
+        ADD     HL,BC           ; add the offset to position found
+        JP      (HL)            ; and jump to the routine e.g. S-BIN
+                                ; making an indirect exit from there.
 
 ; This important routine is called during runtime and from LINE-SCAN
 ; when a BASIC line is checked for syntax. It is this routine that
