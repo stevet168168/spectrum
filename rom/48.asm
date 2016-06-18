@@ -3726,7 +3726,7 @@ L0C55:  LD      DE,L0DD9        ; set DE to address: CL-SET
         LD      A,B             ; transfer the line to A.
         BIT     0,(IY+TVFLAG-ERR_NR)
                                 ; test TV_FLAG - lower screen in use ?
-        JP      NZ,L0D02        ; jump forward to PO-SCR-4 if so.
+        JR      NZ,L0D02        ; jump forward to PO-SCR-4 if so.
 
         CP      (IY+DF_SZ-ERR_NR)
                                 ; greater than DF_SZ display file size ?
@@ -3735,90 +3735,7 @@ L0C55:  LD      DE,L0DD9        ; set DE to address: CL-SET
 
         RET     NZ              ; return (via CL-SET) if greater
 
-        BIT     4,(IY+TVFLAG-ERR_NR)
-                                ; test TV_FLAG  - Automatic listing ?
-        JR      Z,L0C88         ; forward to PO-SCR-2 if not.
-
-        LD      E,(IY+BREG-ERR_NR)
-                                ; fetch BREG - the count of scroll lines to E.
-        DEC     E               ; decrease and jump
-        JR      Z,L0CD2         ; to PO-SCR-3 if zero and scrolling required.
-
-        LD      A,$00           ; explicit - select channel zero.
-        CALL    L1601           ; routine CHAN-OPEN opens it.
-
-        LD      SP,(LISTSP)     ; set stack pointer to LIST_SP
-
-        RES     4,(IY+TVFLAG-ERR_NR)
-                                ; reset TV_FLAG  - signal auto listing finished.
-        RET                     ; return ignoring pushed value, CL-SET
-                                ; to MAIN or EDITOR without updating
-                                ; print position                         >>
-
-; ---
-
-
-;; REPORT-5
-L0C86:  RST     08H             ; ERROR-1
-        DEFB    $04             ; Error Report: Out of screen
-
-; continue here if not an automatic listing.
-
-;; PO-SCR-2
-L0C88:  DEC     (IY+SCR_CT-ERR_NR)
-        JR      NZ,L0CD2        ; forward to PO-SCR-3 to scroll display if
-                                ; result not zero.
-
-; now produce prompt.
-
-        LD      A,$18           ; reset
-        SUB     B               ; the
-        LD      (SCR_CT),A      ; SCR_CT scroll count
-        LD      HL,(ATTR_T)     ; L=ATTR_T, H=MASK_T
-        PUSH    HL              ; save on stack
-        LD      A,(P_FLAG)      ;
-        PUSH    AF              ; save on stack to prevent lower screen
-                                ; attributes (BORDCR etc.) being applied.
-        LD      A,$FD           ; select system channel 'K'
-        CALL    L1601           ; routine CHAN-OPEN opens it
-        XOR     A               ; clear to address message directly
-        LD      DE,L0CF8        ; make DE address: scrl-mssg
-        CALL    L0C0A           ; routine PO-MSG prints to lower screen
-        SET     5,(IY+TVFLAG-ERR_NR)
-                                ; set TV_FLAG  - signal lower screen requires
-                                ; clearing
-        LD      HL,FLAGS        ; make HL address FLAGS
-        SET     3,(HL)          ; signal 'L' mode.
-        RES     5,(HL)          ; signal 'no new key'.
-        EXX                     ; switch to main set.
-                                ; as calling chr input from alternative set.
-        CALL    L15D4           ; routine WAIT-KEY waits for new key
-                                ; Note. this is the right routine but the
-                                ; stream in use is unsatisfactory. From the
-                                ; choices available, it is however the best.
-
-        EXX                     ; switch back to alternate set.
-        CP      $20             ; space is considered as BREAK
-        JR      Z,L0D00         ; forward to REPORT-D if so
-                                ; 'BREAK - CONT repeats'
-
-        CP      $E2             ; is character 'STOP' ?
-        JR      Z,L0D00         ; forward to REPORT-D if so
-
-        OR      $20             ; convert to lower-case
-        CP      $6E             ; is character 'n' ?
-        JR      Z,L0D00         ; forward to REPORT-D if so else scroll.
-
-        LD      A,$FE           ; select system channel 'S'
-        CALL    L1601           ; routine CHAN-OPEN
-        POP     AF              ; restore original P_FLAG
-        LD      (P_FLAG),A      ; and save in P_FLAG.
-        POP     HL              ; restore original ATTR_T, MASK_T
-        LD      (ATTR_T),HL     ; and reset ATTR_T, MASK-T as 'scroll?' has
-                                ; been printed.
-
-;; PO-SCR-3
-L0CD2:  CALL    L0DFE           ; routine CL-SC-ALL to scroll whole display
+        CALL    L0DFE           ; routine CL-SC-ALL to scroll whole display
         LD      B,(IY+DF_SZ-ERR_NR)
         INC     B               ; increase to address last line of display
         LD      C,$21           ; set C to $21 (was $21 from above routine)
@@ -3851,18 +3768,9 @@ L0CF0:  LD      (DE),A          ; transfer
         POP     BC              ; restore the line/column.
         RET                     ; return via CL-SET (was pushed on stack).
 
-; ---
-
-; The message 'scroll?' appears here with last byte inverted.
-
-;; scrl-mssg
-L0CF8:  DEFB    $80             ; initial step-over byte.
-        DEFM    "scroll"
-        DEFB    '?'+$80
-
-;; REPORT-D
-L0D00:  RST     08H             ; ERROR-1
-        DEFB    $0C             ; Error Report: BREAK - CONT repeats
+;; REPORT-5
+L0C86:  RST     08H             ; ERROR-1
+        DEFB    $04             ; Error Report: Out of screen
 
 ; continue here if using lower display - A holds line number.
 
