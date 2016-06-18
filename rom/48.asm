@@ -1522,39 +1522,6 @@ L046E:  DEFB    $89, $02, $D0, $12, $86;  261.625565290         C
 ;** Part 4. CASSETTE HANDLING ROUTINES **
 ;****************************************
 
-;   These routines begin with the service routines followed by a single
-;   command entry point.
-;   The first of these service routines is a curiosity.
-
-; -----------------------
-; THE 'ZX81 NAME' ROUTINE
-; -----------------------
-;   This routine fetches a filename in ZX81 format and is not used by the 
-;   cassette handling routines in this ROM.
-
-;; zx81-name
-L04AA:  CALL    L24FB           ; routine SCANNING to evaluate expression.
-        LD      A,(FLAGS)       ; fetch system variable FLAGS.
-        ADD     A,A             ; test bit 7 - syntax, bit 6 - result type.
-        JP      M,L1C8A         ; to REPORT-C if not string result
-                                ; 'Nonsense in BASIC'.
-
-        POP     HL              ; drop return address.
-        RET     NC              ; return early if checking syntax.
-
-        PUSH    HL              ; re-save return address.
-        CALL    L2BF1           ; routine STK-FETCH fetches string parameters.
-        LD      H,D             ; transfer start of filename
-        LD      L,E             ; to the HL register.
-        DEC     C               ; adjust to point to last character and
-        RET     M               ; return if the null string.
-                                ; or multiple of 256!
-
-        ADD     HL,BC           ; find last character of the filename.
-                                ; and also clear carry.
-        SET     7,(HL)          ; invert it.
-        RET                     ; return.
-
 ; =========================================
 ;
 ; PORT 254 ($FE)
@@ -3212,9 +3179,7 @@ L0A4F:  LD      C,$21           ; the leftmost column position.
 ; tabstops.  The routine is only reached via the control character table.
 
 ;; PO-COMMA
-L0A5F:  CALL    L0B03           ; routine PO-FETCH - seems unnecessary.
-
-        LD      A,C             ; the column position. $21-$01
+L0A5F:  LD      A,C             ; the column position. $21-$01
         DEC     A               ; move right. $20-$00
         DEC     A               ; and again   $1F-$00 or $FF if trailing
         AND     $10             ; will be $00 or $10.
@@ -5271,13 +5236,6 @@ L11CB:  LD      B,A             ; Save the flag to control later branching.
                                 ; and can't be in the range $40 - $7F as 'snow'
                                 ; appears on the screen.
 
-        NOP                     ; These seem unnecessary.
-        NOP                     ;
-        NOP                     ;
-        NOP                     ;
-        NOP                     ;
-        NOP                     ;
-
 ; -----------------------
 ; THE 'RAM CHECK' SECTION
 ; -----------------------
@@ -5405,18 +5363,6 @@ L121C:
         INC     HL              ; Advance address.
         LD      (E_LINE),HL     ; Set E_LINE, where the edit line
                                 ; will be created.
-                                ; Note. it is not strictly necessary to
-                                ; execute the next fifteen bytes of code
-                                ; as this will be done by the call to SET-MIN.
-                                ; --
-        LD      (HL),$0D        ; initially just has a carriage return
-        INC     HL              ; followed by
-        LD      (HL),$80        ; an end-marker.
-        INC     HL              ; address the next location.
-        LD      (WORKSP),HL     ; set WORKSP - empty workspace.
-        LD      (STKBOT),HL     ; set STKBOT - bottom of the empty stack.
-        LD      (STKEND),HL     ; set STKEND to the end of the empty stack.
-                                ; --
         LD      A,$38           ; the colour system is set to white paper,
                                 ; black ink, no flash or bright.
         LD      (ATTR_P),A      ; set ATTR_P permanent colour attributes.
@@ -5761,7 +5707,6 @@ L1539:  DEFB    $7F                                     ; copyright
 ;; REPORT-G
 ; No Room for line
 L1555:  LD      A,$10           ; i.e. 'G' -$30 -$07
-        LD      BC,$0000        ; this seems unnecessary.
         JP      L1313           ; jump back to MAIN-G
 
 ; -----------------------------
@@ -6274,20 +6219,6 @@ L16C5:  LD      HL,(STKBOT)     ; fetch STKBOT value
         LD      (MEM),HL        ; is restored to system variable MEM.
         POP     HL              ; saved value not required.
         RET                     ; return.
-
-; ------------------
-; Reclaim edit-line?
-; ------------------
-; This seems to be legacy code from the ZX80/ZX81 as it is 
-; not used in this ROM.
-; That task, in fact, is performed here by the dual-area routine CLEAR-SP.
-; This routine is designed to deal with something that is known to be in the
-; edit buffer and not workspace.
-; On entry, HL must point to the end of the something to be deleted.
-
-;; REC-EDIT
-L16D4:  LD      DE,(E_LINE)     ; fetch start of edit line from E_LINE.
-        JP      L19E5           ; jump forward to RECLAIM-1.
 
 ; --------------------------
 ; The Table INDEXING routine
@@ -9368,21 +9299,6 @@ L1F15:  LD      L,$03           ; prepare 'Out of Memory'
         JP      L0055           ; jump back to ERROR-3 at $0055
                                 ; Note. this error can't be trapped at $0008
 
-; ------------------------------
-; THE 'FREE MEMORY' USER ROUTINE
-; ------------------------------
-; This routine is not used by the ROM but allows users to evaluate
-; approximate free memory with PRINT 65536 - USR 7962.
-
-;; free-mem
-L1F1A:  LD      BC,$0000        ; allow no overhead.
-
-        CALL    L1F05           ; routine TEST-ROOM.
-
-        LD      B,H             ; transfer the result
-        LD      C,L             ; to the BC register.
-        RET                     ; the USR function returns value of BC.
-
 ; --------------------
 ; THE 'RETURN' COMMAND
 ; --------------------
@@ -9900,11 +9816,6 @@ L2096:  LD      (IY+TVFLAG-ERR_NR),$01
                                 ; ensuring that the correct set of system 
                                 ; variables are updated and that the border 
                                 ; colour is used. 
-
-;   Note. The Complete Spectrum ROM Disassembly incorrectly names DF-SZ as the
-;   system variable that is updated above and if, as some have done, you make 
-;   this unnecessary alteration then there will be two blank lines between the
-;   lower screen and the upper screen areas which will also scroll wrongly.
 
         CALL    L20C1           ; routine IN-ITEM-1 to handle the input.
 
@@ -14777,15 +14688,6 @@ L2D7F:  INC     HL              ; skip zero indicator.
         LD      D,A             ; place in D
         RET                     ; return
 
-; ------------------------
-; Store a positive integer
-; ------------------------
-; This entry point is not used in this ROM but would
-; store any integer as positive.
-
-;; p-int-sto
-L2D8C:  LD      C,$00           ; make sign byte positive and continue
-
 ; -------------
 ; Store integer
 ; -------------
@@ -14817,9 +14719,6 @@ L2D8E:  PUSH    HL              ; preserve HL
         LD      (HL),A          ; store 2's complement.
         INC     HL              ;
         LD      (HL),$00        ; last byte always zero for integers.
-                                ; is not used and need not be looked at when
-                                ; testing for zero but comes into play should
-                                ; an integer be converted to fp.
         POP     HL              ; restore HL
         RET                     ; return.
 
@@ -18325,9 +18224,7 @@ L371A:  RST     08H             ; ERROR-1
         DEFB    $09             ; Error Report: Invalid argument
 
 ;; VALID
-L371C:  DEFB    $A0             ;;stk-zero              Note. not 
-        DEFB    $02             ;;delete                necessary.
-        DEFB    $38             ;;end-calc
+L371C:  DEFB    $38             ;;end-calc
         LD      A,(HL)          ;
 
         LD      (HL),$80        ;
