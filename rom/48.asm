@@ -153,11 +153,10 @@ L0010:  JP      L15F2           ; Jump forward to continue at PRINT-A-2.
 ;; GET-CHAR
 L0018:  LD      HL,(CH_ADD)     ; fetch the address from CH_ADD.
         LD      A,(HL)          ; use it to pick up current character.
-
-;; TEST-CHAR
-L001C:  CALL    L007D           ; routine SKIP-OVER tests if the character is
+        JR      L007D           ; routine SKIP-OVER tests if the character is
                                 ; relevant.
-        RET     NC              ; Return if it is significant.
+
+        DEFB    $FF, $FF        ; unused
 
 ; ------------------------------------
 ; THE 'COLLECT NEXT CHARACTER' RESTART
@@ -166,12 +165,8 @@ L001C:  CALL    L007D           ; routine SKIP-OVER tests if the character is
 ;   called repeatedly to step along the line.  It is used 83 times.
 
 ;; NEXT-CHAR
-L0020:  CALL    L0074           ; routine CH-ADD+1 fetches the next immediate
-                                ; character.
-        JR      L001C           ; jump back to TEST-CHAR until a valid
-                                ; character is found.
-
-; ---
+L0020:  LD      HL,(CH_ADD)     ; fetch the address from CH_ADD.
+        JR      L0080           ; routine SKIP-OVER-1
 
         DEFB    $FF, $FF, $FF   ; unused
 
@@ -349,55 +344,23 @@ X007B:  LD      A,(HL)          ; load character to A from HL.
 ; --------------------------
 ; THE 'SKIP OVER' SUBROUTINE
 ; --------------------------
-;   This subroutine is called once from RST 18 to skip over white-space and
-;   other characters irrelevant to the parsing of a BASIC line etc. .
+;   This subroutine is called once from RST 18 to skip over spaces.
 ;   Initially the A register holds the character to be considered
 ;   and HL holds its address which will not be within quoted text
 ;   when a BASIC line is parsed.
-;   Although the 'tab' and 'at' characters will not appear in a BASIC line,
-;   they could be present in a string expression, and in other situations.
-;   Note. although white-space is usually placed in a program to indent loops
-;   and make it more readable, it can also be used for the opposite effect and
-;   spaces may appear in variable names although the parser never sees them.
-;   It is this routine that helps make the variables 'Anum bEr5 3BUS' and
-;   'a number 53 bus' appear the same to the parser.
 
 ;; SKIP-OVER
-L007D:  CP      $21             ; test if higher than space.
-        RET     NC              ; return with carry clear if so.
+L007D:  CP      $20             ; test if space.
+        RET     NZ              ; return if not.
 
-        CP      $0D             ; carriage return ?
-        RET     Z               ; return also with carry clear if so.
+;; SKIP-OVER-1
+L0080:  INC     HL              ; skip
+        LD      A,(HL)          ; load character
+        CP      $20             ; test if space
+        JR      Z,L0080         ; jump back if so
 
-                                ; all other characters have no relevance
-                                ; to the parser and must be returned with
-                                ; carry set.
-
-        CP      $10             ; test if 0-15d
-        RET     C               ; return, if so, with carry set.
-
-        CP      $18             ; test if 24-32d
-        CCF                     ; complement carry flag.
-        RET     C               ; return with carry set if so.
-
-                                ; now leaves 16d-23d
-
-        INC     HL              ; all above have at least one extra character
-                                ; to be stepped over.
-
-        CP      $16             ; controls 22d ('at') and 23d ('tab') have two.
-        JR      C,L0090         ; forward to SKIPS with ink, paper, flash,
-                                ; bright, inverse or over controls.
-                                ; Note. the high byte of tab is for RS232 only.
-                                ; it has no relevance on this machine.
-
-        INC     HL              ; step over the second character of 'at'/'tab'.
-
-;; SKIPS
-L0090:  SCF                     ; set the carry flag
-        LD      (CH_ADD),HL     ; update the CH_ADD system variable.
-        RET                     ; return with carry set.
-
+        LD      (CH_ADD),HL     ; update CH_ADD
+        RET
 
 ; ------------------
 ; THE 'TOKEN' TABLES
