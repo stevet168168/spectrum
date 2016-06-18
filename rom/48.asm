@@ -5448,17 +5448,7 @@ L12AC:  LD      A,$00           ; select channel 'K' the keyboard
 ; the branch was here if syntax has passed test.
 
 ;; MAIN-3
-L12CF:  LD      HL,(E_LINE)     ; fetch the edit line address from E_LINE.
-
-        LD      (CH_ADD),HL     ; system variable CH_ADD is set to first
-                                ; character of edit line.
-                                ; Note. the above two instructions are a little
-                                ; inadequate. 
-                                ; They are repeated with a subtle difference 
-                                ; at the start of the next subroutine and are 
-                                ; therefore not required above.
-
-        CALL    L19FB           ; routine E-LINE-NO will fetch any line
+L12CF:  CALL    L19FB           ; routine E-LINE-NO will fetch any line
                                 ; number to BC if this is a program line.
 
         LD      A,B             ; test if the number of
@@ -6000,7 +5990,7 @@ L162C:  JP      (HL)            ; jump to the routine
 ; --------------------------
 ; This table is used by the routine above to find one of the three
 ; flag setting routines below it.
-; A zero end-marker is required as channel 'R' is not present.
+; A zero end-marker is required as channels 'P' and 'R' are not present.
 
 ;; chn-cd-lu
 L162D:  DEFB    'K', L1634-$-1  ; offset $06 to CHAN-K
@@ -6214,10 +6204,8 @@ L16BF:  LD      HL,(WORKSP)     ; fetch WORKSP value
 L16C5:  LD      HL,(STKBOT)     ; fetch STKBOT value 
         LD      (STKEND),HL     ; and place in STKEND.
 
-        PUSH    HL              ; perhaps an obsolete entry point.
         LD      HL,MEM_0        ; normal location of MEM-0
         LD      (MEM),HL        ; is restored to system variable MEM.
-        POP     HL              ; saved value not required.
         RET                     ; return.
 
 ; --------------------------
@@ -14951,17 +14939,11 @@ L2E1E:  PUSH    DE              ; save the part before decimal point.
 ; ---------------------
 
 ; the branch was here when 'int x' was found to be zero as in say 0.5.
-; The zero has been fetched from the calculator stack but not deleted and
-; this should occur now. This omission leaves the stack unbalanced and while
-; that causes no problems with a simple PRINT statement, it will if str$ is
-; being used in an expression e.g. "2" + STR$ 0.5 gives the result "0.5"
-; instead of the expected result "20.5".
-; credit Tony Stratton, 1982.
-; A DEFB 02 delete is required immediately on using the calculator.
 
 ;; PF-SMALL
 L2E24:  RST     28H             ;; FP-CALC       int x = 0.
-L2E25:  DEFB    $E2             ;;get-mem-2      int x = 0, x-int x.
+        DEFB    $02             ;;delete         .
+        DEFB    $E2             ;;get-mem-2      int x-int x.
         DEFB    $38             ;;end-calc
 
         LD      A,(HL)          ; fetch exponent of positive fractional number
@@ -15000,14 +14982,7 @@ L2E25:  DEFB    $E2             ;;get-mem-2      int x = 0, x-int x.
         LD      (HL),A          ; and store updated value
         POP     HL              ; restore HL
 
-        JP      L2ECF           ; JUMP forward to PF-FRACTN
-
-; ---
-
-; Note. while it would be pedantic to comment on every occasion a JP
-; instruction could be replaced with a JR instruction, this applies to the
-; above, which is useful if you wish to correct the unbalanced stack error
-; by inserting a 'DEFB 02 delete' at L2E25, and maintain main addresses.
+        JR      L2ECF           ; JUMP forward to PF-FRACTN
 
 ; the branch was here with a large positive integer > 65535 e.g. 123456789
 ; the accumulator holds the exponent.
@@ -18086,7 +18061,6 @@ L36C2:  DEFB    $38             ;;end-calc              -4.
 ;; EXP
 ;; exp
 L36C4:  RST     28H             ;; FP-CALC
-        DEFB    $3D             ;;re-stack      (not required - mult will do)
         DEFB    $34             ;;stk-data
         DEFB    $F1             ;;Exponent: $81, Bytes: 4
         DEFB    $38,$AA,$3B,$29 ;;
