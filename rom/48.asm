@@ -16277,12 +16277,12 @@ L32D7:  DEFW    L368F           ; $00 Address: $368F - jump-true
         DEFW    L351B           ; $07 Address: $351B - or
 
         DEFW    L3524           ; $08 Address: $3524 - no-&-no
-        DEFW    L353B           ; $09 Address: $353B - no-l-eql
-        DEFW    L353B           ; $0A Address: $353B - no-gr-eql
-        DEFW    L353B           ; $0B Address: $353B - nos-neql
-        DEFW    L353B           ; $0C Address: $353B - no-grtr
-        DEFW    L353B           ; $0D Address: $353B - no-less
-        DEFW    L353B           ; $0E Address: $353B - nos-eql
+        DEFW    L3531           ; $09 Address: $3531 - no-l-eql
+        DEFW    L3532           ; $0A Address: $3532 - no-gr-eql
+        DEFW    L3533           ; $0B Address: $3533 - nos-neql
+        DEFW    L3534           ; $0C Address: $3534 - no-grtr
+        DEFW    L3535           ; $0D Address: $3535 - no-less
+        DEFW    L3536           ; $0E Address: $3536 - nos-eql
         DEFW    L3014           ; $0F Address: $3014 - addition
 
         DEFW    L352D           ; $10 Address: $352D - str-&-no
@@ -17057,7 +17057,8 @@ L34F9:  CALL    L34E9           ; routine TEST-ZERO
         RET     C               ; return if was zero as this
                                 ; is also the Boolean 'false' value.
 
-        LD      A,$FF           ; prepare XOR mask for sign bit
+;; gr-eq-0
+L34FD:  LD      A,$FF           ; prepare XOR mask for sign bit
         JR      L3507           ; forward to SIGN-TO-C
                                 ; to put sign in carry
                                 ; (carry will become set if sign is positive)
@@ -17210,14 +17211,48 @@ L352D:  EX      DE,HL           ; make HL point to the number.
         POP     DE              ; restore pointer - new STKEND.
         RET                     ; return.
 
-; ---------------------------
-; THE 'COMPARISON' OPERATIONS
-; ---------------------------
+; -----------------------------------
+; THE 'NUMERIC COMPARISON' OPERATIONS
+; -----------------------------------
+; (offset: $09 'no-l-eql')
 ; (offset: $0A 'no-gr-eql')
 ; (offset: $0B 'nos-neql')
 ; (offset: $0C 'no-grtr')
 ; (offset: $0D 'no-less')
 ; (offset: $0E 'nos-eql')
+
+;; no-l-eql
+L3531:  CALL    L300F           ; subtract
+        CALL    L34E9           ; test-zero
+        JR      C,L350B         ; overwrite 1 on carry
+        JR      L3506           ; less-0
+
+;; no-gr-eql
+L3532:  CALL    L300F           ; subtract
+        JR      L34FD           ; gr-eq-0
+
+;; nos-neql
+L3533:  CALL    L300F           ; subtract
+        CALL    L34E9           ; test-zero
+        CCF                     ; flip carry
+        JR      L350B           ; overwrite 1 on carry
+
+;; no-grtr
+L3534:  CALL    L300F           ; subtract
+        JR      L34F9           ; greater-0
+
+;; no-less
+L3535:  CALL    L300F           ; subtract
+        JR      L3506           ; less-0
+
+;; nos-eql
+L3536:  CALL    L300F           ; subtract
+        CALL    L34E9           ; test-zero
+        JR      L350B           ; overwrite 1 on carry
+
+; ----------------------------------
+; THE 'STRING COMPARISON' OPERATIONS
+; ----------------------------------
 ; (offset: $11 'str-l-eql')
 ; (offset: $12 'str-gr-eql')
 ; (offset: $13 'strs-neql')
@@ -17225,101 +17260,27 @@ L352D:  EX      DE,HL           ; make HL point to the number.
 ; (offset: $15 'str-less')
 ; (offset: $16 'strs-eql')
 
-;   True binary operations.
-;   A single entry point is used to evaluate six numeric and six string
-;   comparisons. On entry, the calculator literal is in the B register and
-;   the two numeric values, or the two string parameters, are on the 
-;   calculator stack.
-;   The individual bits of the literal are manipulated to group similar
-;   operations although the SUB 8 instruction does nothing useful and merely
-;   alters the string test bit.
-;   Numbers are compared by subtracting one from the other, strings are 
-;   compared by comparing every character until a mismatch, or the end of one
-;   or both, is reached.
-;
-;   Numeric Comparisons.
-;   --------------------
-;   The 'x>y' example is the easiest as it employs straight-thru logic.
-;   Number y is subtracted from x and the result tested for greater-0 yielding
-;   a final value 1 (true) or 0 (false). 
-;   For 'x<y' the same logic is used but the two values are first swapped on the
-;   calculator stack. 
-;   For 'x=y' NOT is applied to the subtraction result yielding true if the
-;   difference was zero and false with anything else. 
-;   The first three numeric comparisons are just the opposite of the last three
-;   so the same processing steps are used and then a final NOT is applied.
-;
-; literal    Test   No  sub 8       ExOrNot  1st RRCA  exch sub  ?   End-Tests
-; =========  ====   == ======== === ======== ========  ==== ===  =  === === ===
-; no-l-eql   x<=y   09 00000001 dec 00000000 00000000  ---- x-y  ?  --- >0? NOT
-; no-gr-eql  x>=y   0A 00000010 dec 00000001 10000000c swap y-x  ?  --- >0? NOT
-; nos-neql   x<>y   0B 00000011 dec 00000010 00000001  ---- x-y  ?  NOT --- NOT
-; no-grtr    x>y    0C 00000100  -  00000100 00000010  ---- x-y  ?  --- >0? ---
-; no-less    x<y    0D 00000101  -  00000101 10000010c swap y-x  ?  --- >0? ---
-; nos-eql    x=y    0E 00000110  -  00000110 00000011  ---- x-y  ?  NOT --- ---
-;
-;                                                           comp -> C/F
-;                                                           ====    ===
-; str-l-eql  x$<=y$ 11 00001001 dec 00001000 00000100  ---- x$y$ 0  !or >0? NOT
-; str-gr-eql x$>=y$ 12 00001010 dec 00001001 10000100c swap y$x$ 0  !or >0? NOT
-; strs-neql  x$<>y$ 13 00001011 dec 00001010 00000101  ---- x$y$ 0  !or >0? NOT
-; str-grtr   x$>y$  14 00001100  -  00001100 00000110  ---- x$y$ 0  !or >0? ---
-; str-less   x$<y$  15 00001101  -  00001101 10000110c swap y$x$ 0  !or >0? ---
-; strs-eql   x$=y$  16 00001110  -  00001110 00000111  ---- x$y$ 0  !or >0? ---
-;
-;   String comparisons are a little different in that the eql/neql carry flag
-;   from the 2nd RRCA is, as before, fed into the first of the end tests but
-;   along the way it gets modified by the comparison process. The result on the
-;   stack always starts off as zero and the carry fed in determines if NOT is 
-;   applied to it. So the only time the greater-0 test is applied is if the
-;   stack holds zero which is not very efficient as the test will always yield
-;   zero. The most likely explanation is that there were once separate end tests
-;   for numbers and strings.
-
 ;; no-l-eql,etc.
 L353B:  LD      A,B             ; transfer literal to accumulator.
-        SUB     $08             ; subtract eight - which is not useful. 
-
         BIT     2,A             ; isolate '>', '<', '='.
-
         JR      NZ,L3543        ; skip to EX-OR-NOT with these.
 
-        DEC     A               ; else make $00-$02, $08-$0A to match bits 0-2.
+        DEC     A               ; else make $10-$12 to match bits 0-2.
 
 ;; EX-OR-NOT
 L3543:  RRCA                    ; the first RRCA sets carry for a swap. 
-        JR      NC,L354E        ; forward to NU-OR-STR with other 8 cases
+        JR      NC,L3559        ; forward to STRINGS with other 8 cases
 
 ; for the other 4 cases the two values on the calculator stack are exchanged.
 
         PUSH    AF              ; save A and carry.
         PUSH    HL              ; save HL - pointer to first operand.
                                 ; (DE points to second operand).
-
         CALL    L343C           ; routine exchange swaps the two values.
                                 ; (HL = second operand, DE = STKEND)
-
         POP     DE              ; DE = first operand
         EX      DE,HL           ; as we were.
         POP     AF              ; restore A and carry.
-
-; Note. it would be better if the 2nd RRCA preceded the string test.
-; It would save two duplicate bytes and if we also got rid of that sub 8 
-; at the beginning we wouldn't have to alter which bit we test.
-
-;; NU-OR-STR
-L354E:  BIT     2,A             ; test if a string comparison.
-        JR      NZ,L3559        ; forward to STRINGS if so.
-
-; continue with numeric comparisons.
-
-        RRCA                    ; 2nd RRCA causes eql/neql to set carry.
-        PUSH    AF              ; save A and carry
-
-        CALL    L300F           ; routine subtract leaves result on stack.
-        JR      L358C           ; forward to END-TESTS
-
-; ---
 
 ;; STRINGS
 L3559:  RRCA                    ; 2nd RRCA causes eql/neql to set carry.
@@ -17364,14 +17325,12 @@ L356B:  POP     BC              ; pop the second length off stack.
                                 ; manipulated so that this is success path. 
         JR      L3588           ; forward to leave via STR-TEST
 
-; ---
 ; the branch was here with a match
 
 ;; BOTH-NULL
 L3572:  POP     AF              ; restore carry - set for eql/neql
         JR      L3588           ; forward to STR-TEST
 
-; ---  
 ; the branch was here when 2nd string not null and low byte of first is yet
 ; to be tested.
 
@@ -17391,13 +17350,11 @@ L3575:  OR      C               ; test the length of first string.
 
         DEC     BC              ; decrease length of 1st string.
         INC     DE              ; increment 1st string pointer.
-
         INC     HL              ; increment 2nd string pointer.
         EX      (SP),HL         ; swap with length on stack
         DEC     HL              ; decrement 2nd string length
         JR      L3564           ; back to BYTE-COMP
 
-; ---
 ; the false condition.
 
 ;; FRST-LESS
@@ -17405,7 +17362,6 @@ L3585:  POP     BC              ; discard length
         POP     AF              ; pop A
         AND     A               ; clear the carry for false result.
 
-; ---
 ; exact match and x$>y$ rejoin here
 
 ;; STR-TEST
@@ -17415,23 +17371,12 @@ L3588:  PUSH    AF              ; save A and carry
         DEFB    $A0             ;;stk-zero      an initial false value.
         DEFB    $38             ;;end-calc
 
-; both numeric and string paths converge here.
+        POP     AF              ; pop carry  - will be set if eql/neql
 
-;; END-TESTS
-L358C:  POP     AF              ; pop carry  - will be set if eql/neql
         PUSH    AF              ; save it again.
-
         CALL    C,L3501         ; routine NOT sets true(1) if equal(0)
-                                ; or, for strings, applies true result.
-
         POP     AF              ; pop carry and
-        PUSH    AF              ; save A
 
-        CALL    NC,L34F9        ; routine GREATER-0 tests numeric subtraction 
-                                ; result but also needlessly tests the string 
-                                ; value for zero - it must be.
-
-        POP     AF              ; pop A 
         RRCA                    ; the third RRCA - test for '<=', '>=' or '<>'.
         CALL    NC,L3501        ; apply a terminal NOT if so.
         RET                     ; return.
