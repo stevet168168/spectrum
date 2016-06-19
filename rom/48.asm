@@ -6479,8 +6479,7 @@ L1793:  JR      L1725           ; to REPORT-Ob
 ; This produces an automatic listing in the upper screen.
 
 ;; AUTO-LIST
-L1795:  LD      (LISTSP),SP     ; save stack pointer in LIST_SP
-        LD      (IY+TVFLAG-ERR_NR),$10
+L1795:  LD      (IY+TVFLAG-ERR_NR),$10
                                 ; update TV_FLAG set bit 3
         CALL    L0DAF           ; routine CL-ALL.
         SET     0,(IY+TVFLAG-ERR_NR)
@@ -14669,6 +14668,43 @@ L2DD5:  CALL    L2DA2           ; routine FP-TO-BC returns with C in A also.
 L2DE1:  POP     AF              ; restore value and success flag and
         RET                     ; return.
 
+; ---------------------
+; Print a short integer
+; ---------------------
+
+;; PRINT-INT
+N2DE3:  RST     28H             ;; FP-CALC
+        DEFB    $02             ;;delete
+        DEFB    $38             ;;end-calc
+
+        EX      DE,HL
+        INC     HL              ; point to sign
+        LD      A,(HL)
+        INC     HL              ; point to lsb
+        LD      E,(HL)          ; and load
+        INC     HL              ; point to msb
+        LD      D,(HL)          ; and load
+        EX      DE,HL           ; move number to HL
+
+        AND     A               ; test for negative
+        JR      Z,N2DE4         ; jump if positive
+        EX      DE,HL           ; move number back to DE
+        LD      HL,$0000        ; load HL with zero
+        SBC     HL,DE           ; subtract DE
+        LD      A,'-'           ; print minus sign
+        RST     10H
+
+N2DE4:  LD      E,$FF           ; signal no leading spaces/zeros
+        LD      BC,-10000
+        CALL    L192A           ; call OUT-SP-NO to print digit if > 0
+        LD      BC,-1000
+        CALL    L192A           ; call OUT-SP-NO to print digit if > 0
+        LD      BC,-100
+        CALL    L192A           ; call OUT-SP-NO to print digit if > 0
+        LD      BC,-10
+        CALL    L192A           ; call OUT-SP-NO to print digit if > 0
+        LD      A,L
+        JP      L15EF           ; print last digit
 
 ; -----------------------------
 ; Print a floating point number
@@ -14677,32 +14713,17 @@ L2DE1:  POP     AF              ; restore value and success flag and
 ; Begin by considering whether to print a leading sign for negative numbers.
 
 ;; PRINT-FP
-L2DE3:  RST     28H             ;; FP-CALC
-        DEFB    $31             ;;duplicate
-        DEFB    $37             ;;greater-0
-        DEFB    $00             ;;jump-true
+L2DE3:  CALL    L35BF           ; get address of number in HL
+        LD      A,(HL)          ; get exponent
+        OR      A               ; check for short int
+        JR      Z,N2DE3         ; jump to PRINT-INT if so
 
-        DEFB    L2DF8-$         ;;to L2DF8, PF-POSTVE
+        INC     HL              ; advance to sign byte
+        BIT     7,(HL)          ; check for negative
+        JR      Z,L2DF8         ; jump to PF-POSTVE if not
 
-        DEFB    $31             ;;duplicate
-        DEFB    $36             ;;less-0
-        DEFB    $00             ;;jump-true
-
-        DEFB    L2DF2-$         ;;to L2DF2, PF-NEGTVE
-
-; must be zero itself
-
-        DEFB    $02             ;;delete
-        DEFB    $38             ;;end-calc
-
-        LD      A,$30           ; prepare the character '0'
-
-        RST     10H             ; PRINT-A
-        RET                     ; return.                 ->
-; ---
-
-;; PF-NEGTVE
-L2DF2:  DEFB    $2A             ;;abs
+        RST     28H             ;; FP-CALC
+        DEFB    $2A             ;;abs
         DEFB    $38             ;;end-calc
 
         LD      A,$2D           ; the character '-'
@@ -14711,12 +14732,8 @@ L2DF2:  DEFB    $2A             ;;abs
 
 ; and continue to print the now positive number.
 
-        RST     28H             ;; FP-CALC
-
 ;; PF-POSTVE
-L2DF8:  DEFB    $38             ;;end-calc     x.
-
-        LD      HL,MEM_3        ; zero 15 byte temporary buffer
+L2DF8:  LD      HL,MEM_3        ; zero 15 byte temporary buffer
         LD      DE,MEM_3+1
         LD      BC,$0E
         LD      (HL),$00
