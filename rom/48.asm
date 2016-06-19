@@ -14679,16 +14679,16 @@ L2DE1:  POP     AF              ; restore value and success flag and
 ;; PRINT-FP
 L2DE3:  RST     28H             ;; FP-CALC
         DEFB    $31             ;;duplicate
-        DEFB    $36             ;;less-0
-        DEFB    $00             ;;jump-true
-
-        DEFB    $0B             ;;to L2DF2, PF-NEGTVE
-
-        DEFB    $31             ;;duplicate
         DEFB    $37             ;;greater-0
         DEFB    $00             ;;jump-true
 
-        DEFB    $0D             ;;to L2DF8, PF-POSTVE
+        DEFB    L2DF8-$         ;;to L2DF8, PF-POSTVE
+
+        DEFB    $31             ;;duplicate
+        DEFB    $36             ;;less-0
+        DEFB    $00             ;;jump-true
+
+        DEFB    L2DF2-$         ;;to L2DF2, PF-NEGTVE
 
 ; must be zero itself
 
@@ -14714,12 +14714,13 @@ L2DF2:  DEFB    $2A             ;;abs
         RST     28H             ;; FP-CALC
 
 ;; PF-POSTVE
-L2DF8:  DEFB    $A0             ;;stk-zero     x,0.     begin by
-        DEFB    $C3             ;;st-mem-3     x,0.     clearing a temporary
-        DEFB    $C4             ;;st-mem-4     x,0.     output buffer to
-        DEFB    $C5             ;;st-mem-5     x,0.     fifteen zeros.
-        DEFB    $02             ;;delete       x.
-        DEFB    $38             ;;end-calc     x.
+L2DF8:  DEFB    $38             ;;end-calc     x.
+
+        LD      HL,MEM_3        ; zero 15 byte temporary buffer
+        LD      DE,MEM_3+1
+        LD      BC,$0E
+        LD      (HL),$00
+        LDIR
 
         EXX                     ; in case called from 'str$' then save the
         PUSH    HL              ; pointer to whatever comes after
