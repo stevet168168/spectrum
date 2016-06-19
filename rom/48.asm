@@ -153,10 +153,10 @@ L0010:  JP      L15F2           ; Jump forward to continue at PRINT-A-2.
 ;; GET-CHAR
 L0018:  LD      HL,(CH_ADD)     ; fetch the address from CH_ADD.
         LD      A,(HL)          ; use it to pick up current character.
-        JR      L007D           ; routine SKIP-OVER tests if the character is
+        JP      L007D           ; routine SKIP-OVER tests if the character is
                                 ; relevant.
 
-        DEFB    $FF, $FF        ; unused
+        DEFB    $FF             ; unused
 
 ; ------------------------------------
 ; THE 'COLLECT NEXT CHARACTER' RESTART
@@ -166,9 +166,9 @@ L0018:  LD      HL,(CH_ADD)     ; fetch the address from CH_ADD.
 
 ;; NEXT-CHAR
 L0020:  LD      HL,(CH_ADD)     ; fetch the address from CH_ADD.
-        JR      L0080           ; routine SKIP-OVER-1
+        JP      L0080           ; routine SKIP-OVER-1
 
-        DEFB    $FF, $FF, $FF   ; unused
+        DEFB    $FF, $FF        ; unused
 
 ; -----------------------
 ; THE 'CALCULATE' RESTART
