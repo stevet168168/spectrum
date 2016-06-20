@@ -8525,7 +8525,7 @@ L1D34:  PUSH    HL              ; save position.
 
         POP     HL              ; restore variable position
         EX      DE,HL           ; swap pointers
-        LD      C,$0A           ; ten bytes to move
+        LD      BC,$000A        ; ten bytes to move
         LDIR                    ; Copy 'deleted' values to variable.
         LD      HL,(PPC)        ; Load with current line number from PPC
         EX      DE,HL           ; exchange pointers.
