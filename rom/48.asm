@@ -179,13 +179,13 @@ L0020:  LD      HL,(CH_ADD)     ; fetch the address from CH_ADD.
 ;   It is used on 77 occasions.
 
 ;; FP-CALC
-L0028:  JP      L335B           ; jump forward to the CALCULATE routine.
+L0028:  CALL    L35BF           ; routine STK-PNTRS is called to set up the
+                                ; calculator stack pointers for a default
+                                ; unary operation. HL = last value on stack.
+                                ; DE = STKEND first location after stack.
+        JP      L3362           ; jump forward to the CALCULATE routine.
 
-; ---
-
-        DEFB    $FF, $FF, $FF   ; spare - note that on the ZX81, space being a 
-        DEFB    $FF, $FF        ; little cramped, these same locations were
-                                ; used for the five-byte end-calc literal.
+        DEFB    $FF, $FF        ; unused
 
 ; ------------------------------
 ; THE 'CREATE BC SPACES' RESTART
@@ -11781,7 +11781,7 @@ L25E8:  RST     20H             ; NEXT-CHAR
                                 ; 'Nonsense in BASIC'
 
         RST     20H             ; NEXT-CHAR
-        JP      L2712           ; jump forward to S-CONT-2          ===>
+        JP      L2713           ; jump forward to S-CONT-3          ===>
 
 ; ---
 
@@ -12046,10 +12046,7 @@ L26B6:  INC     HL              ; advance pointer
 ;; S-NUMERIC
 L26C3:  SET     6,(IY+FLAGS-ERR_NR)
                                 ; update FLAGS  - Signal numeric result
-        JR      L26DD           ; forward to S-CONT-1               ===>
-                                ; actually S-CONT-2 is destination but why
-                                ; waste a byte on a jump when a JR will do.
-                                ; Actually a JR L2712 can be used. Rats.
+        JR      L2712           ; forward to S-CONT-2               ===>
 
 ; end of functions accessed from scanning functions table.
 
@@ -12284,26 +12281,37 @@ L274C:  PUSH    DE              ; now stack this priority/operation
         CALL    L2530           ; routine SYNTAX-Z
         JR      Z,L275B         ; forward to S-SYNTEST if checking syntax.
 
+        LD      HL,L2759        ; return address for calculator routine
+        PUSH    HL              ; goes to stack
+
         LD      A,E             ; fetch the operation code
         AND     $3F             ; mask off the result/operand bits to leave
                                 ; a calculator literal.
-        LD      B,A             ; transfer to B register
+        RLCA                    ; double the literal
+        LD      L,A             ; store in HL for indexing
+        LD      H,$00
+        RRCA                    ; restore the literal
 
-; now use the calculator to perform the single operation - operand is on
-; the calculator stack.
-; Note. although the calculator is performing a single operation most
-; functions e.g. TAN are written using other functions and literals and
-; these in turn are written using further strings of calculator literals so
-; another level of magical recursion joins the juggling act for a while
-; as the calculator too is calling itself.
+        LD      DE,L32D7        ; tbl-addrs
+        ADD     HL,DE           ; get address of calculator routine
+        LD      E,(HL)
+        INC     HL
+        LD      D,(HL)
+        PUSH    DE              ; calculator routine now our return address
 
-        RST     28H             ;; FP-CALC
-        DEFB    $3B             ;;fp-calc-2
-L2758:  DEFB    $38             ;;end-calc
+        CALL    L35BF           ; routine STK-PNTRS
 
+        CP      $18
+        RET     NC              ; to calculator routine if unary
+
+        LD      BC,$FFFB        ; the value -5
+        LD      D,H             ; transfer HL, the last value, to DE.
+        LD      E,L             ;
+        ADD     HL,BC           ; subtract 5 making HL point to second
+        RET                     ; to calculator routine
+
+L2759:  LD      (STKEND),DE     ; save end of stack in system variable STKEND
         JR      L2764           ; forward to S-RUNTEST
-
-; ---
 
 ; the branch was here if checking syntax only. 
 
@@ -12730,7 +12738,7 @@ L288D:  POP     DE              ; location of ')' in DEF FN to DE.
         LD      (DEFADD),HL     ; and re-insert into DEFADD system variable.
 
         RST     20H             ; NEXT-CHAR advances to character after ')'
-        JP      L2712           ; to S-CONT-2 - to continue current
+        JP      L2713           ; to S-CONT-3 - to continue current
                                 ; invocation of scanning
 
 ; --------------------
@@ -16375,23 +16383,6 @@ L32D7:  DEFW    L368F           ; $00 Address: $368F - jump-true
 ;  Lao Tze 604 - 531 B.C.
 
 ;; CALCULATE
-L335B:  CALL    L35BF           ; routine STK-PNTRS is called to set up the
-                                ; calculator stack pointers for a default
-                                ; unary operation. HL = last value on stack.
-                                ; DE = STKEND first location after stack.
-
-; the calculate routine is called at this point by the series generator...
-
-;; GEN-ENT-1
-L335E:  LD      A,B             ; fetch the Z80 B register to A
-        LD      (BREG),A        ; and store value in system variable BREG.
-                                ; this will be the counter for dec-jr-nz
-                                ; or if used from fp-calc2 the calculator
-                                ; instruction.
-
-; ... and again later at this point
-
-;; GEN-ENT-2
 L3362:  EXX                     ; switch sets
         EX      (SP),HL         ; and store the address of next instruction,
                                 ; the return address, in H'L'.
@@ -16458,6 +16449,7 @@ L3380:  CP      $18             ; compare with first unary operations.
 ;; DOUBLE-A
 L338C:  RLCA                    ; double the literal
         LD      L,A             ; and store in L for indexing
+        RRCA                    ; restore the literal (for str cmp ops)
 
 ;; ENT-TABLE
 L338E:  LD      DE,L32D7        ; Address: tbl-addrs
@@ -16470,12 +16462,6 @@ L338E:  LD      DE,L32D7        ; Address: tbl-addrs
         EX      (SP),HL         ; goes to stack
         PUSH    DE              ; now address of routine
         EXX                     ; main set
-                                ; avoid using IY register.
-        LD      BC,(STKEND+1)   ; STKEND_hi
-                                ; nothing much goes to C but BREG to B
-                                ; and continue into next ret instruction
-                                ; which has a dual identity
-
 
 ; ------------------
 ; Handle delete (02)
@@ -16502,7 +16488,6 @@ L33A2:  POP     AF              ; drop return address.
                                 ; value will be literal e.g. 'tan'
         EXX                     ; switch to alt
         JR      L336C           ; back to SCAN-ENT
-                                ; next literal will be end-calc at L2758
 
 ; ---------------------------------
 ; THE 'TEST FIVE SPACES' SUBROUTINE
@@ -16764,8 +16749,8 @@ L343E:  LD      A,(DE)          ; each byte of second
 ;   and Dr Frank O'Hara, published 1983 by Melbourne House.
 
 ;; series-xx
-L3449:  LD      B,A             ; parameter $00 - $1F to B counter
-        CALL    L335E           ; routine GEN-ENT-1 is called.
+L3449:  LD      (BREG),A        ; parameter $00 - $1F to B counter
+        CALL    L3362           ; routine CALCULATE is called.
                                 ; A recursive call to a special entry point
                                 ; in the calculator that puts the B register
                                 ; in the system variable BREG. The return
@@ -16801,7 +16786,7 @@ L3453:  DEFB    $31             ;;duplicate       v,v.
 
         CALL    L33C6           ; routine STK-DATA is called directly to
                                 ; push a value and advance H'L'.
-        CALL    L3362           ; routine GEN-ENT-2 recursively re-enters
+        CALL    L3362           ; routine CALCULATE recursively re-enters
                                 ; the calculator without disturbing
                                 ; system variable BREG
                                 ; H'L' value goes on the machine stack and is
@@ -17278,8 +17263,7 @@ L3536:  CALL    L300F           ; subtract
 ; (offset: $16 'strs-eql')
 
 ;; no-l-eql,etc.
-L353B:  LD      A,B             ; transfer literal to accumulator.
-        BIT     2,A             ; isolate '>', '<', '='.
+L353B:  BIT     2,A             ; isolate '>', '<', '='.
         JR      NZ,L3543        ; skip to EX-OR-NOT with these.
 
         DEC     A               ; else make $10-$12 to match bits 0-2.
