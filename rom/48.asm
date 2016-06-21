@@ -6699,9 +6699,7 @@ L1855:  LD      BC,(E_PPC)      ; fetch E_PPC the current line which may be
                                 ; leave E zero if same or after.
 
 ;; OUT-LINE1
-L1865:  LD      (IY+BREG-ERR_NR),E 
-                                ; save flag in BREG which is spare.
-        LD      A,(HL)          ; get high byte of line number.
+L1865:  LD      A,(HL)          ; get high byte of line number.
         CP      $40             ; is it too high ($2F is maximum possible) ?
         POP     BC              ; drop the return address and
         RET     NC              ; make an early return if so >>>
@@ -8700,37 +8698,32 @@ L1DD8:  RST     08H             ; ERROR-1
 ; latter case, have had the step, possibly negative, added to the value.
 
 ;; NEXT-LOOP
-L1DDA:  RST     28H             ;; FP-CALC
+L1DDA:  LD      HL,(MEM)
+        LD      DE,$000B
+        ADD     HL,DE
+        BIT     7,(HL)
+        JR      NZ,L1DE2        ; NEXT-1
+
+        RST     28H             ;; FP-CALC
         DEFB    $E1             ;;get-mem-1        l.
         DEFB    $E0             ;;get-mem-0        l,v.
-        DEFB    $E2             ;;get-mem-2        l,v,s.
-        DEFB    $36             ;;less-0           l,v,(1/0) negative step ?
-        DEFB    $00             ;;jump-true        l,v.(1/0)
-
-        DEFB    $02             ;;to L1DE2, NEXT-1 if step negative
-
-        DEFB    $01             ;;exchange         v,l.
+        DEFB    $03             ;;subtract         l-v.
+        DEFB    $38             ;;end-calc         l-v.
+        JR      L1DE9           ; NEXT-2
 
 ;; NEXT-1
-L1DE2:  DEFB    $03             ;;subtract         l-v OR v-l.
-        DEFB    $37             ;;greater-0        (1/0)
-        DEFB    $00             ;;jump-true        .
-
-        DEFB    $04             ;;to L1DE9, NEXT-2 if no more iterations.
-
-        DEFB    $38             ;;end-calc         .
-
-        AND     A               ; clear carry flag signalling another loop.
-        RET                     ; return
-
-; ---
+L1DE2:  RST     28H             ;; FP-CALC
+        DEFB    $E0             ;;get-mem-0        v.
+        DEFB    $E1             ;;get-mem-1        v,l.
+        DEFB    $03             ;;subtract         v-l.
+        DEFB    $38             ;;end-calc         v-l.
 
 ;; NEXT-2
-L1DE9:  DEFB    $38             ;;end-calc         .
-
-        SCF                     ; set carry flag signalling looping exhausted.
+L1DE9:  LD      (STKEND),HL     ; delete difference
+        INC     HL              ; advance to sign byte
+        LD      A,(HL)          ; load it
+        RLCA                    ; force bit 7 to carry
         RET                     ; return
-
 
 ; -------------------
 ; Handle READ command
