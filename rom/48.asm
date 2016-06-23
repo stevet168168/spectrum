@@ -7090,13 +7090,6 @@ L1980:  LD      A,(HL)          ; Load the high byte of line number and
 ; 1) To find the D'th statement in a line.
 ; 2) To find a token in held E.
 
-;; not-used
-L1988:  INC     HL              ;
-        INC     HL              ;
-        INC     HL              ;
-
-; -> entry point.
-
 ;; EACH-STMT
 L198B:  LD      (CH_ADD),HL     ; save HL in CH_ADD
         LD      C,$00           ; initialize quotes flag
@@ -8466,25 +8459,13 @@ L1D00:  JP      L1B29           ; to STMT-L-1, if true (1) to execute command
 
 ;; FOR
 L1D03:  CP      $CD             ; is there a 'STEP' ?
-        JR      NZ,L1D10        ; to F-USE-1 if not to use 1 as default.
+        JR      NZ,L1D10        ; to FOR-1 if not to use 1 as default.
 
         RST     20H             ; NEXT-CHAR
         CALL    L1C82           ; routine EXPT-1NUM
         CALL    L1BEE           ; routine CHECK-END
-        JR      L1D16           ; to F-REORDER
 
-; ---
-
-;; F-USE-1
-L1D10:  CALL    L1BEE           ; routine CHECK-END
-
-        RST     28H             ;; FP-CALC      v,l.
-        DEFB    $A1             ;;stk-one       v,l,1=s.
-        DEFB    $38             ;;end-calc
-
-
-;; F-REORDER
-L1D16:  RST     28H             ;; FP-CALC       v,l,s.
+        RST     28H             ;; FP-CALC       v,l,s.
         DEFB    $C0             ;;st-mem-0       v,l,s.
         DEFB    $02             ;;delete         v,l.
         DEFB    $01             ;;exchange       l,v.
@@ -8492,7 +8473,19 @@ L1D16:  RST     28H             ;; FP-CALC       v,l,s.
         DEFB    $01             ;;exchange       l,s,v.
         DEFB    $38             ;;end-calc
 
-        CALL    L2AFF           ; routine LET assigns the initial value v to
+        JR      L1D1D           ; to FOR-2
+
+;; FOR-1
+L1D10:  CALL    L1BEE           ; routine CHECK-END
+
+        RST     28H             ;; FP-CALC       v,l.
+        DEFB    $01             ;;exchange       l,v.
+        DEFB    $A1             ;;stk-one        l,v,1=s.
+        DEFB    $01             ;;exchange       l,s,v.
+        DEFB    $38             ;;end-calc
+
+;; FOR-2
+L1D1D:  CALL    L2AFF           ; routine LET assigns the initial value v to
                                 ; the variable altering type if necessary.
         LD      (MEM),HL        ; The system variable MEM is made to point to
                                 ; the variable instead of its normal
