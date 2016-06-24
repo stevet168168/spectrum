@@ -6754,8 +6754,8 @@ L18A1:  CALL    L18E1           ; routine OUT-CURS will print the cursor if
                                 ; this is the right position.
         EX      DE,HL           ; restore address pointer to HL.
         LD      A,(HL)          ; fetch the addressed character.
-        CALL    L18B6           ; routine NUMBER skips a hidden floating 
-                                ; point number if present.
+        CP      $0E             ; is it number marker?
+        CALL    Z,L18B6         ; routine NUMBER if so.
         INC     HL              ; now increment the pointer.
         CP      $0D             ; is character end-of-line ?
         JR      Z,L18B4         ; to OUT-LINE6, if so, as line is finished.
@@ -6785,10 +6785,7 @@ L18B4:  POP     DE              ; bring back the flag E, zero if current
 ; and may mask old 5-byte string parameters.
 
 ;; NUMBER
-L18B6:  CP      $0E             ; character fourteen ?
-        RET     NZ              ; return if not.
-
-        INC     HL              ; skip the character
+L18B6:  INC     HL              ; skip the character
         INC     HL              ; and five bytes
         INC     HL              ; following.
         INC     HL              ;
@@ -7090,38 +7087,24 @@ L1980:  LD      A,(HL)          ; Load the high byte of line number and
 ; 1) To find the D'th statement in a line.
 ; 2) To find a token in held E.
 
-;; not-used
-L1988:  INC     HL              ;
-        INC     HL              ;
-        INC     HL              ;
-
-; -> entry point.
-
 ;; EACH-STMT
-L198B:  LD      (CH_ADD),HL     ; save HL in CH_ADD
-        LD      C,$00           ; initialize quotes flag
+L198B:  LD      C,$00           ; initialize quotes flag
 
 ;; EACH-S-1
 L1990:  DEC     D               ; decrease statement count
-        RET     Z               ; return if zero
-
-
-        RST     20H             ; NEXT-CHAR
-        CP      E               ; is it the search token ?
-        JR      NZ,L199A        ; forward to EACH-S-3 if not
-
-        AND     A               ; clear carry
-        RET                     ; return signalling success.
-
-; ---
+        JR      Z,L19B6         ; forward to EACH-X-EXIT if zero
 
 ;; EACH-S-2
-L1998:  INC     HL              ; next address
+L1993:  INC     HL              ; next address
         LD      A,(HL)          ; next character
+        CP      ' '             ; is it space?
+        JR      Z,L1993         ; back to EACH-S-2 if so
+        CP      E               ; is it the search token ?
+        JR      Z,L19B6         ; forward to EACH-S-EXIT if so
 
 ;; EACH-S-3
-L199A:  CALL    L18B6           ; routine NUMBER skips if number marker
-        LD      (CH_ADD),HL     ; save in CH_ADD
+L199A:  CP      $0E             ; is it number marker?
+        CALL    Z,L18B6         ; routine NUMBER if so
         CP      $22             ; is it quotes '"' ?
         JR      NZ,L19A5        ; to EACH-S-4 if not
 
@@ -7130,23 +7113,26 @@ L199A:  CALL    L18B6           ; routine NUMBER skips if number marker
 ;; EACH-S-4
 L19A5:  CP      $3A             ; is it ':'
         JR      Z,L19AD         ; to EACH-S-5
-
         CP      $CB             ; 'THEN'
-        JR      NZ,L19B1        ; to EACH-S-6
+        JR      Z,L19AD         ; to EACH-S-5
+
+        CP      $0D             ; end of line ?
+        JR      NZ,L19B1        ; to EACH-S-2
+
+        SCF                     ; set carry flag - not found
+
+;; EACH-X-EXIT
+L19B6:  LD      (CH_ADD),HL     ; save HL in CH_ADD
+        RET                     ; return
 
 ;; EACH-S-5
 L19AD:  BIT     0,C             ; is it in quotes
         JR      Z,L1990         ; to EACH-S-1 if not
 
 ;; EACH-S-6
-L19B1:  CP      $0D             ; end of line ?
-        JR      NZ,L1998        ; to EACH-S-2
-
-        DEC     D               ; decrease the statement counter
-                                ; which should be zero else
-                                ; 'Statement Lost'.
-        SCF                     ; set carry flag - not found
-        RET                     ; return
+L19B1:  INC     HL              ; next address
+        LD      A,(HL)          ; next character
+        JR      L199A           ; back to EACH-S-3
 
 ; -----------------------------------------------------------------------
 ; Storage of variables. For full details - see chapter 24.
