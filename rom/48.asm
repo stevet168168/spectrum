@@ -16673,10 +16673,8 @@ L342D:  PUSH    HL              ; save the result pointer.
         LD      HL,(MEM)        ; fetch MEM the base of memory area.
         CALL    L3406           ; routine LOC-MEM sets HL to the destination.
         EX      DE,HL           ; swap - HL is start, DE is destination.
-        CALL    L33C0           ; routine MOVE-FP.
-                                ; note. a short ld bc,5; ldir
-                                ; the embedded memory check is not required
-                                ; so these instructions would be faster.
+        LD      BC,$0005        ; 5 bytes to ...
+        LDIR                    ; copy
         EX      DE,HL           ; DE = STKEND
         POP     HL              ; restore original result pointer
         RET                     ; return.
