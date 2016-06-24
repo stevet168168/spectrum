@@ -8688,24 +8688,32 @@ L1DDA:  LD      HL,(MEM)
         LD      DE,$000B
         ADD     HL,DE
         BIT     7,(HL)
+        LD      DE,(STKEND)     ; stack base
+        PUSH    DE              ; subtract 1st arg
+        LD      HL,(MEM)        ; value storage
+        LD      BC,$0005        ; number size
         JR      NZ,L1DE2        ; NEXT-1
 
-        RST     28H             ;; FP-CALC
-        DEFB    $E1             ;;get-mem-1        l.
-        DEFB    $E0             ;;get-mem-0        l,v.
-        DEFB    $03             ;;subtract         l-v.
-        DEFB    $38             ;;end-calc         l-v.
+        ADD     HL,BC           ; point to limit
+        LDIR                    ; copy
+        PUSH    DE              ; subtract 2nd arg
+        AND     A
+        LD      C,$05
+        SBC     HL,BC
+        SBC     HL,BC           ; point to value
         JR      L1DE9           ; NEXT-2
 
 ;; NEXT-1
-L1DE2:  RST     28H             ;; FP-CALC
-        DEFB    $E0             ;;get-mem-0        v.
-        DEFB    $E1             ;;get-mem-1        v,l.
-        DEFB    $03             ;;subtract         v-l.
-        DEFB    $38             ;;end-calc         v-l.
+L1DE2:  LDIR                    ; copy
+        PUSH    DE              ; subtract 2nd arg
+        LD      C,$05
 
 ;; NEXT-2
-L1DE9:  LD      (STKEND),HL     ; delete difference
+L1DE9:  LDIR                    ; copy
+        POP     DE              ; restore subtract args
+        POP     HL
+        CALL    L300F           ; subtract
+        LD      (STKEND),HL     ; restore stack end
         INC     HL              ; advance to sign byte
         LD      A,(HL)          ; load it
         RLCA                    ; force bit 7 to carry
