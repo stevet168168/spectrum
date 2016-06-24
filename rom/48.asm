@@ -8646,13 +8646,28 @@ L1DAB:  BIT     1,(IY+FLAGX-ERR_NR)
         LD      (MEM),HL        ; and set MEM to point to three 5-byte values
                                 ; value, limit, step.
 
-        RST     28H             ;; FP-CALC     add step and re-store
-        DEFB    $E0             ;;get-mem-0    v.
-        DEFB    $E2             ;;get-mem-2    v,s.
-        DEFB    $0F             ;;addition     v+s.
-        DEFB    $C0             ;;st-mem-0     v+s.
-        DEFB    $02             ;;delete       .
-        DEFB    $38             ;;end-calc
+        ; TODO space check
+
+        LD      DE,(STKEND)
+        LD      BC,$0005
+        PUSH    DE
+        LDIR
+        PUSH    DE
+
+        LD      C,$05
+        ADD     HL,BC
+        LDIR
+
+        POP     DE
+        POP     HL
+        CALL    L3014           ; addition
+        LD      (STKEND),HL
+
+        EX      DE,HL
+        LD      HL,(MEM)
+        LD      BC,$0005
+        EX      DE,HL
+        LDIR
 
         CALL    L1DDA           ; routine NEXT-LOOP tests against limit.
         RET     C               ; return if no more iterations possible.
